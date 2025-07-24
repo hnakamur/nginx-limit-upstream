@@ -176,9 +176,6 @@ static ngx_stream_module_t ngx_stream_limit_ups_module_ctx = {
 
     ngx_stream_limit_ups_create_srv_conf,
     ngx_stream_limit_ups_merge_srv_conf,
-
-    NULL,
-    NULL
 };
 
 
