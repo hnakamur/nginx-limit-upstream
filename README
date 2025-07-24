@@ -115,9 +115,16 @@ patch -p1 < nginx-1.12.1-stream.patch (nginx 1.21.1)
 or
 patch -p1 < nginx-1.28.0-stream.patch (nginx 1.28.X)
 
+if you want to build the module as a static module, run the fowlloing commands:
 ./configure --add-module=/path/to/module
 make
 make install
+
+if you want to build the module as a dynamic module, run the fowlloing commands:
+./configure --add-dynamic-module=/path/to/module
+make
+make install
+
 
 =PATCH=================================================================
 
