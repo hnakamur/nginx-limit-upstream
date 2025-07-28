@@ -377,8 +377,6 @@ ngx_stream_limit_ups_cleanup(void *data)
                           ctx->s->connection->read->timer.key);
         }
 
-        ngx_del_timer(ctx->s->connection->write);
-
         if (wnode->w_timer_set) {
             if (ctx->s->connection->write->timedout) {
                 ctx->s->connection->write->handler(ctx->s->connection->write);
@@ -389,6 +387,10 @@ ngx_stream_limit_ups_cleanup(void *data)
             if (ngx_handle_write_event(ctx->s->connection->write, 0)
                 != NGX_OK)
             {
+                if (ctx->s->connection->write->timer_set) {
+                    ngx_del_timer(ctx->s->connection->write);
+                }
+
                 ngx_stream_proxy_finalize(ctx->s,
                                           NGX_STREAM_INTERNAL_SERVER_ERROR);
                 return;
