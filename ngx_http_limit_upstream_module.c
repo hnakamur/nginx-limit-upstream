@@ -228,7 +228,7 @@ ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
     l = ctx->lnode;
     l->qlen--;
 
-    ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+    ngx_http_finalize_request(r, NGX_HTTP_GATEWAY_TIME_OUT);
 }
 
 
