@@ -107,9 +107,13 @@ or
 cp /path/to/module/nginx.1.10.1.patch /path/to/nginx-1.10.0/debian/patches (nginx 1.10 on debian)
 or
 patch -p1 < nginx-1.12.1.patch  (nginx 1.12.X)
+or
+patch -p1 < nginx-1.28.0.patch  (nginx 1.28.X)
 
 if you want to use the module for stream, use this patch in addition:
-patch -p1 < nginx-1.12.1-stream.patch
+patch -p1 < nginx-1.12.1-stream.patch (nginx 1.21.1)
+or
+patch -p1 < nginx-1.28.0-stream.patch (nginx 1.28.X)
 
 ./configure --add-module=/path/to/module
 make
@@ -122,6 +126,7 @@ However, I did not test it on the other versions :)
   The nginx.1.4.4.patch is based on nginx 1.4.4, and tested only under nginx 1.4.4.
   And there is patches for nginx.1.8.1 and 1.10.1.
   Thanks to @ivan-antonyuck, who made patch for nginx 1.10.X and 1.10 on debian.
+  The nginx-1.28.0.patch is based on nginx 1.28.0, and tested only under nginx 1.28.0.
 
 =BUGS==================================================================
 
