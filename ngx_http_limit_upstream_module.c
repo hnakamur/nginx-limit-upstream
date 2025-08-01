@@ -327,8 +327,6 @@ ngx_http_limit_upstream_cleanup(void *data)
         ctx->r->read_event_handler = wnode->read_event_handler;
         ctx->r->write_event_handler = wnode->write_event_handler;
 
-        ngx_del_timer(ctx->r->connection->read);
-
         if (wnode->r_timer_set) {
             if (ctx->r->connection->read->timedout) {
                 ctx->r->read_event_handler(ctx->r);
@@ -338,6 +336,10 @@ ngx_http_limit_upstream_cleanup(void *data)
             if (ngx_handle_read_event(ctx->r->connection->read, 0)
                 != NGX_OK)
             {
+                if (ctx->r->connection->read->timer_set) {
+                    ngx_del_timer(ctx->r->connection->read);
+                }
+
                 ngx_http_finalize_request(ctx->r,
                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
@@ -346,8 +348,6 @@ ngx_http_limit_upstream_cleanup(void *data)
             ngx_add_timer(ctx->r->connection->read,
                           ctx->r->connection->read->timer.key);
         }
-
-        ngx_del_timer(ctx->r->connection->write);
 
         if (wnode->w_timer_set) {
             if (ctx->r->connection->write->timedout) {
@@ -358,6 +358,10 @@ ngx_http_limit_upstream_cleanup(void *data)
             if (ngx_handle_write_event(ctx->r->connection->write, 0)
                 != NGX_OK)
             {
+                if (ctx->r->connection->write->timer_set) {
+                    ngx_del_timer(ctx->r->connection->write);
+                }
+
                 ngx_http_finalize_request(ctx->r,
                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
                 return;
