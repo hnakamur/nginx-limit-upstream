@@ -6,6 +6,12 @@
 #include <ngx_http.h>
 
 
+#define NGX_HTTP_LIMIT_UPS_PASSED            1
+#define NGX_HTTP_LIMIT_UPS_DELAYED           2
+#define NGX_HTTP_LIMIT_UPS_REJECTED          3
+#define NGX_HTTP_LIMIT_UPS_TIMEOUT           4
+
+
 static ngx_rbtree_t                  ngx_http_limit_upstream_loc_rbtree;
 static ngx_rbtree_node_t             ngx_http_limit_upstream_sentinel;
 
@@ -109,6 +115,8 @@ static void ngx_http_limit_upstream_save_peer_session(ngx_peer_connection_t *pc,
 static ngx_int_t ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us);
 
+static ngx_int_t ngx_http_limit_upstream_status_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 static void *ngx_http_limit_upstream_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_limit_upstream_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -116,6 +124,7 @@ static char *ngx_http_limit_upstream_zone(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_http_limit_upstream_conn(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static ngx_int_t ngx_http_limit_upstream_add_variables(ngx_conf_t *cf);
 static ngx_int_t ngx_http_limit_upstream_init(ngx_conf_t *cf);
 
 static ngx_int_t ngx_http_limit_upstream_init_zone(ngx_shm_zone_t *shm_zone,
@@ -158,7 +167,7 @@ static ngx_command_t ngx_http_limit_upstream_commands[] = {
 
 
 static ngx_http_module_t ngx_http_limit_upstream_module_ctx = {
-    NULL,
+    ngx_http_limit_upstream_add_variables,
     ngx_http_limit_upstream_init,
 
     NULL,
@@ -188,6 +197,23 @@ ngx_module_t ngx_http_limit_upstream_module = {
 };
 
 
+static ngx_http_variable_t  ngx_http_limit_upstream_vars[] = {
+
+    { ngx_string("limit_upstream_status"), NULL,
+      ngx_http_limit_upstream_status_variable, 0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
+
+      ngx_http_null_variable
+};
+
+
+static ngx_str_t  ngx_http_limit_upstream_status[] = {
+    ngx_string("PASSED"),
+    ngx_string("DELAYED"),
+    ngx_string("REJECTED"),
+    ngx_string("TIMEOUT"),
+};
+
+
 static void
 ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
 {
@@ -212,6 +238,7 @@ ngx_http_limit_upstream_timeout(ngx_http_request_t *r)
 
     ctx = (ngx_http_limit_upstream_ctx_t *) u->peer.data;
 
+    r->limit_upstream_status = NGX_HTTP_LIMIT_UPS_TIMEOUT;
     ngx_log_error(ctx->lucf->log_level, r->connection->log, 0,
                   "limit upstream: request[%p] is timeout", r);
 
@@ -559,6 +586,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         snode->counter--;
 
         if (lnode->qlen >= ctx->lucf->backlog) {
+            ctx->r->limit_upstream_status = NGX_HTTP_LIMIT_UPS_REJECTED;
             ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
                           "limit upstream: request[%p] is dropped", ctx->r);
             return NGX_DECLINED;
@@ -576,6 +604,7 @@ ngx_http_limit_upstream_get_peer(ngx_peer_connection_t *pc, void *data)
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ctx->r->connection->log, 0,
                        "limit upstream: add queue node: %p", &wnode->queue);
 
+        ctx->r->limit_upstream_status = NGX_HTTP_LIMIT_UPS_DELAYED;
         ngx_log_error(ctx->lucf->log_level, ctx->r->connection->log, 0,
                       "limit upstream: request[%p] is blocked", ctx->r);
 
@@ -702,6 +731,26 @@ ngx_http_limit_upstream_init_peer(ngx_http_request_t *r,
     ctx->r = r;
     ctx->lucf = lucf;
     r->upstream->blocked = 0;
+    r->limit_upstream_status = NGX_HTTP_LIMIT_UPS_PASSED;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_limit_upstream_add_variables(ngx_conf_t *cf)
+{
+    ngx_http_variable_t  *var, *v;
+
+    for (v = ngx_http_limit_upstream_vars; v->name.len; v++) {
+        var = ngx_http_add_variable(cf, &v->name, v->flags);
+        if (var == NULL) {
+            return NGX_ERROR;
+        }
+
+        var->get_handler = v->get_handler;
+        var->data = v->data;
+    }
 
     return NGX_OK;
 }
@@ -751,6 +800,27 @@ ngx_http_limit_upstream_init(ngx_conf_t *cf)
             }
         }
     }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_limit_upstream_status_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    unsigned n = r->limit_upstream_status;
+
+    if (n == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = ngx_http_limit_upstream_status[n - 1].len;
+    v->data = ngx_http_limit_upstream_status[n - 1].data;
 
     return NGX_OK;
 }
